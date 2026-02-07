@@ -255,6 +255,28 @@ if st.session_state.current_page == "1. 資產盤點":
 elif st.session_state.current_page == "2. 防禦診斷":
     st.header("🩺 步驟二：防禦成熟度診斷")
     
+    # --- 新增：評分指南 Popover (浮動視窗) ---
+    with st.popover("📖 打開評分指南 (Cheatsheet)", use_container_width=True):
+        st.markdown("### 🔍 NIST CSF 五大功能定義")
+        st.markdown("""
+        * **識別 (Identify)**：我知道我有什麼資產，以及風險在哪。
+        * **保護 (Protect)**：我有裝鎖、裝防毒，讓駭客打不進來。
+        * **偵測 (Detect)**：如果駭客進來了，我能馬上發現警告。
+        * **應變 (Respond)**：發現被駭，我知道該怎麼止血、通報。
+        * **復原 (Recover)**：出事後，我能把資料救回來，恢復營運。
+        """)
+        st.divider()
+        st.markdown("### 📊 成熟度評分標準 (Tier 1-4)")
+        st.markdown("""
+        | 分數 | 等級 | 定義說明 |
+        | :---: | :--- | :--- |
+        | **0** | **N/A** | **不適用** (無此功能需求) |
+        | **1** | **Tier 1 (被動)** | **有做，但無章法**。<br>通常是發生問題才處理，沒有正式規範。 |
+        | **2** | **Tier 2 (部分)** | **有流程，但未全面落實**。<br>知道該怎麼做，但依賴特定人員，沒寫成SOP。 |
+        | **3** | **Tier 3 (標準)** | **SOP 標準化**。<br>有白紙黑字規定，且全公司都照著做。 |
+        | **4** | **Tier 4 (自動)** | **數據驅動與自動化**。<br>系統能自動阻擋攻擊，並持續優化防禦。 |
+        """)
+
     target_category = st.selectbox("請選擇要評估的類別：", ["裝置", "應用程式", "網路", "資料", "使用者"])
     
     assets_in_cat = st.session_state.assets[st.session_state.assets['類別'] == target_category]
@@ -262,7 +284,7 @@ elif st.session_state.current_page == "2. 防禦診斷":
     if assets_in_cat.empty:
         st.warning(f"⚠️ 尚未建立「{target_category}」類別的資產，請回上一步新增。")
     else:
-        st.info(f"正在評估 {len(assets_in_cat)} 項資產。")
+        st.info(f"正在評估 {len(assets_in_cat)} 項資產。請點擊上方指南參考評分標準。")
         
         tabs = st.tabs(["識別 (ID)", "保護 (PR)", "偵測 (DE)", "應變 (RS)", "復原 (RC)"])
         functions = ["識別", "保護", "偵測", "應變", "復原"]
@@ -305,7 +327,8 @@ elif st.session_state.current_page == "2. 防禦診斷":
                                 }[x],
                                 key=f"radio_{asset}_{func}",
                                 horizontal=True,
-                                label_visibility="collapsed"
+                                label_visibility="collapsed",
+                                help="請參考上方「評分指南」定義分數"
                             )
                             if score != current_val:
                                 st.session_state.assessments[key] = score
