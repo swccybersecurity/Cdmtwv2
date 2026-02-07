@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import io
+import random
 
 # --- 設定頁面 (Page Config) ---
 st.set_page_config(page_title="Taiwan CDM 戰情室 Pro", layout="wide")
@@ -40,10 +41,8 @@ solutions_db = {
 
 # --- 初始化 Session State ---
 if 'assets' not in st.session_state:
-    # 預設為空 DataFrame
     st.session_state.assets = pd.DataFrame(columns=["資產名稱", "類別", "皇冠寶石"])
 if 'assessments' not in st.session_state:
-    # Key=(資產名稱, 功能), Value=分數 (0~4)
     st.session_state.assessments = {}
 if 'current_page' not in st.session_state:
     st.session_state.current_page = "1. 資產盤點"
@@ -57,21 +56,42 @@ if page_selection != st.session_state.current_page:
     st.session_state.current_page = page_selection
     st.rerun()
 
-# --- 輔助函式：生成 Excel 範本 ---
-def create_template_excel():
-    # 建立範例資料
-    data = {
-        "資產名稱": ["公司官網(範例)", "客戶資料庫(範例)", "員工筆電(範例)"],
-        "類別": ["應用程式", "資料", "裝置"],
-        "皇冠寶石": ["否", "是", "否"]  # 使用者可以填 是/否, Y/N
-    }
-    df = pd.DataFrame(data)
+# --- 輔助函式：生成 Excel (支援空白或範例) ---
+def create_template_excel(mode="empty"):
+    columns = ["資產名稱", "類別", "皇冠寶石"]
     
+    if mode == "example":
+        # === 生成 50 筆測試資料 ===
+        categories = ["裝置", "應用程式", "網路", "資料", "使用者"]
+        data = []
+        
+        for cat in categories:
+            for i in range(1, 11): # 每類產生 10 筆，共 50 筆
+                is_crown = "是" if random.random() < 0.2 else "否" # 20% 機率為皇冠
+                
+                # 產生擬真的資產名稱
+                if cat == "裝置":
+                    name = f"員工筆電_{random.randint(100,999)}" if i > 3 else f"核心伺服器_{i:02d}"
+                elif cat == "應用程式":
+                    name = f"HR系統_{i}" if i % 2 == 0 else f"ERP模組_{i}"
+                elif cat == "網路":
+                    name = f"防火牆_{i:02d}" if i < 3 else f"辦公區Switch_{i:02d}"
+                elif cat == "資料":
+                    name = f"客戶個資DB_{i}" if is_crown == "是" else f"日常備份_{i}"
+                else: # 使用者
+                    name = f"行政人員_{i:02d}" if i > 2 else f"系統管理員_{i:02d}"
+                    
+                data.append([name, cat, is_crown])
+        
+        df = pd.DataFrame(data, columns=columns)
+    else:
+        # === 生成僅有標題的空白資料 ===
+        df = pd.DataFrame(columns=columns)
+
     # 寫入 Buffer
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='資產清單')
-        # 可以加入註解或說明 sheet，這裡保持簡單
     buffer.seek(0)
     return buffer
 
@@ -97,7 +117,6 @@ def calculate_cell_status(category, function):
         if score > 0:
             scores.append(score)
             details.append(f"{asset_name}: Tier {score}")
-            # 皇冠法則
             if is_crown and score < 3:
                 has_crown_risk = True
     
@@ -112,70 +131,77 @@ def calculate_cell_status(category, function):
     else: return "tier-4", 4, details
 
 # ==========================================
-# 頁面 1: 資產盤點 (Inventory) - 新增匯入功能
+# 頁面 1: 資產盤點 (Inventory)
 # ==========================================
 if st.session_state.current_page == "1. 資產盤點":
     st.header("📍 步驟一：建立戰場地圖 (Inventory)")
     
     # --- 區塊 A: 批次匯入 / 下載 ---
     with st.expander("📤 批次匯入 / 下載範本 (Excel)", expanded=True):
-        col_dl, col_up = st.columns([1, 2])
+        col_dl, col_up = st.columns([1, 1])
         
         with col_dl:
             st.markdown("#### 1. 取得格式")
-            st.caption("請先下載標準格式，填寫後上傳。")
-            excel_bytes = create_template_excel()
-            st.download_button(
-                label="📥 下載標準範本 (.xlsx)",
-                data=excel_bytes,
-                file_name="CDM_資產盤點範本.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            )
+            st.caption("選擇下載：")
+            
+            b1, b2 = st.columns(2)
+            with b1:
+                st.download_button(
+                    label="📄 空白範本",
+                    data=create_template_excel(mode="empty"),
+                    file_name="CDM_空白盤點表.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
+            with b2:
+                st.download_button(
+                    label="🎲 50筆範例",
+                    data=create_template_excel(mode="example"),
+                    file_name="CDM_範例資料(50筆).xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    use_container_width=True
+                )
 
         with col_up:
             st.markdown("#### 2. 上傳盤點表")
-            uploaded_file = st.file_uploader("支援 .xlsx 格式，上傳後將**覆蓋**現有資料", type=["xlsx"])
+            uploaded_file = st.file_uploader("支援 .xlsx，上傳後**覆蓋**現有資料", type=["xlsx"])
             
             if uploaded_file is not None:
                 try:
-                    # 讀取 Excel
                     df_new = pd.read_excel(uploaded_file)
                     
                     # 簡易檢查欄位
                     required_cols = {"資產名稱", "類別", "皇冠寶石"}
                     if not required_cols.issubset(df_new.columns):
-                        st.error(f"❌ 格式錯誤！請確保 Excel 包含以下欄位：{required_cols}")
+                        st.error(f"❌ 格式錯誤！缺少欄位：{required_cols}")
                     else:
-                        # 資料預覽
-                        st.dataframe(df_new.head(3), hide_index=True)
                         st.info(f"偵測到 {len(df_new)} 筆資產資料。")
                         
-                        if st.button("✅ 確認匯入 (覆蓋現有資料)", type="primary"):
-                            # 資料清洗
-                            # 1. 處理皇冠寶石 (轉為 Boolean)
+                        if st.button("✅ 確認匯入 (覆蓋)", type="primary"):
+                            # 資料清洗：皇冠寶石轉 Boolean
                             def parse_crown(val):
                                 val_str = str(val).lower().strip()
                                 return val_str in ["yes", "y", "是", "true", "1"]
                             
                             df_new["皇冠寶石"] = df_new["皇冠寶石"].apply(parse_crown)
                             
-                            # 2. 處理類別 (簡單防呆，若不在五大類則標註未知，或這裡可以做更嚴格的檢查)
+                            # 資料清洗：類別防呆
                             valid_cats = ["裝置", "應用程式", "網路", "資料", "使用者"]
-                            df_new["類別"] = df_new["類別"].apply(lambda x: x if x in valid_cats else "裝置") # 預設容錯歸類到裝置，或可改為"其他"
+                            df_new["類別"] = df_new["類別"].apply(lambda x: x if x in valid_cats else "裝置")
 
-                            # 3. 更新 Session State (覆蓋模式)
+                            # 更新 Session State (覆蓋)
                             st.session_state.assets = df_new
-                            st.session_state.assessments = {} # 清空舊評分，避免對應錯誤
+                            st.session_state.assessments = {} # 清空舊評分
                             
-                            st.success("🎉 匯入成功！舊資料已更新。")
+                            st.success("🎉 匯入成功！資料已更新。")
                             st.rerun()
                             
                 except Exception as e:
-                    st.error(f"讀取檔案失敗：{e}")
+                    st.error(f"讀取失敗：{e}")
 
     st.divider()
 
-    # --- 區塊 B: 手動新增 (保留原有功能) ---
+    # --- 區塊 B: 手動新增 ---
     st.subheader("✍️ 手動新增資產")
     with st.container():
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
@@ -189,7 +215,6 @@ if st.session_state.current_page == "1. 資產盤點":
         
         if add_btn:
             if asset_name:
-                # 檢查重複
                 current_names = st.session_state.assets['資產名稱'].values if not st.session_state.assets.empty else []
                 if asset_name not in current_names:
                     new_row = {"資產名稱": asset_name, "類別": asset_type, "皇冠寶石": is_crown}
@@ -200,11 +225,10 @@ if st.session_state.current_page == "1. 資產盤點":
             else:
                 st.error("請輸入名稱")
 
-    # --- 區塊 C: 目前清單顯示 ---
+    # --- 區塊 C: 清單顯示 ---
     if not st.session_state.assets.empty:
-        st.subheader(f"📋 目前資產清單 ({len(st.session_state.assets)} 筆)")
+        st.subheader(f"📋 資產清單 ({len(st.session_state.assets)} 筆)")
         
-        # 顯示 Dataframe 並 Highlight 皇冠
         def highlight_crown(val): return 'background-color: #ffd700; color: black' if val else ''
         
         st.dataframe(
@@ -213,13 +237,12 @@ if st.session_state.current_page == "1. 資產盤點":
             hide_index=True
         )
         
-        # 清空按鈕
         if st.button("🗑️ 清空所有資產"):
             st.session_state.assets = pd.DataFrame(columns=["資產名稱", "類別", "皇冠寶石"])
             st.session_state.assessments = {}
             st.rerun()
     else:
-        st.info("👈 目前清單為空，請使用上方工具匯入或新增。")
+        st.info("👈 清單為空，請匯入或新增。")
 
     st.divider()
     if st.button("下一步：防禦診斷 👉", use_container_width=True):
@@ -227,7 +250,7 @@ if st.session_state.current_page == "1. 資產盤點":
         st.rerun()
 
 # ==========================================
-# 頁面 2: 防禦診斷 (Assessment) - 維持原樣
+# 頁面 2: 防禦診斷 (Assessment)
 # ==========================================
 elif st.session_state.current_page == "2. 防禦診斷":
     st.header("🩺 步驟二：防禦成熟度診斷")
@@ -246,7 +269,7 @@ elif st.session_state.current_page == "2. 防禦診斷":
         
         for i, func in enumerate(functions):
             with tabs[i]:
-                # 進度條計算
+                # 進度條
                 total_items = len(assets_in_cat)
                 assessed_count = 0
                 for _, row in assets_in_cat.iterrows():
@@ -275,10 +298,10 @@ elif st.session_state.current_page == "2. 防禦診斷":
                                 index=current_val,
                                 format_func=lambda x: {
                                     0: "⚪ N/A",
-                                    1: "🔴 Tier 1 (被動)",
-                                    2: "🟡 Tier 2 (部分)",
-                                    3: "🟢 Tier 3 (標準)",
-                                    4: "🏆 Tier 4 (自動)"
+                                    1: "🔴 Tier 1",
+                                    2: "🟡 Tier 2",
+                                    3: "🟢 Tier 3",
+                                    4: "🏆 Tier 4"
                                 }[x],
                                 key=f"radio_{asset}_{func}",
                                 horizontal=True,
@@ -286,7 +309,6 @@ elif st.session_state.current_page == "2. 防禦診斷":
                             )
                             if score != current_val:
                                 st.session_state.assessments[key] = score
-                                # 這裡不需要 rerun，Streamlit 會自動更新 state
                         st.divider()
 
     col_prev, col_next = st.columns(2)
@@ -300,7 +322,7 @@ elif st.session_state.current_page == "2. 防禦診斷":
             st.rerun()
 
 # ==========================================
-# 頁面 3: 風險戰情室 (Dashboard) - 維持原樣
+# 頁面 3: 風險戰情室 (Dashboard)
 # ==========================================
 elif st.session_state.current_page == "3. 風險戰情室":
     st.header("📊 步驟三：CDM 風險戰情室")
@@ -309,7 +331,7 @@ elif st.session_state.current_page == "3. 風險戰情室":
     functions = ["識別", "保護", "偵測", "應變", "復原"]
     recommendation_list = []
 
-    # --- 繪製 HTML 矩陣 ---
+    # --- HTML 矩陣 ---
     html_code = """
     <style>
         table {width: 100%; border-collapse: separate; border-spacing: 3px;}
@@ -367,45 +389,44 @@ elif st.session_state.current_page == "3. 風險戰情室":
     
     st.markdown(html_code, unsafe_allow_html=True)
 
-    # --- 智慧處方籤 ---
+    # --- 處方籤 ---
     st.divider()
     st.subheader("💊 智慧處方籤 (AI 推薦 x SecPaaS)")
     
     SECPAAS_URL = "https://secpaas.org.tw/W_SecDocProduct"
     
     if recommendation_list:
-        st.write(f"共偵測到 **{len(recommendation_list)}** 個需要強化的防禦區塊：")
+        st.write(f"共偵測到 **{len(recommendation_list)}** 個弱點：")
         
         for cat, func, status in recommendation_list:
             if status == "crown_risk":
-                label = "🚨 皇冠風險 (Critical)"
+                label = "🚨 皇冠風險"
                 desc = "關鍵資產防護不足，需立即改善！"
             elif status == "tier-1":
-                label = "🔴 嚴重缺口 (Tier 1)"
-                desc = "缺乏基礎防禦或流程。"
+                label = "🔴 Tier 1 缺口"
+                desc = "缺乏基礎防禦。"
             else:
-                label = "🟡 建議強化 (Tier 2)"
-                desc = "覆蓋率或標準化不足。"
+                label = "🟡 Tier 2 強化"
+                desc = "標準化不足。"
             
             with st.expander(f"{label}：[{cat} - {func}]", expanded=True):
                 c1, c2 = st.columns([3, 1])
                 with c1:
                     vendors = solutions_db.get((cat, func), [])
-                    vendor_txt = "、".join(vendors[:4]) + ("..." if len(vendors)>4 else "") if vendors else "請點擊右側查詢"
-                    
+                    vendor_txt = "、".join(vendors[:4]) + ("..." if len(vendors)>4 else "") if vendors else "請查詢"
                     st.markdown(f"**診斷：** {desc}")
-                    st.markdown(f"👀 **參考廠商範例：** {vendor_txt}")
+                    st.markdown(f"👀 **廠商參考：** {vendor_txt}")
                 with c2:
                     st.write("")
                     st.link_button("🔍 找廠商", url=SECPAAS_URL)
     else:
         if st.session_state.assets.empty:
-            st.warning("⚠️ 目前無資產資料，無法進行分析。請回第一步。")
+            st.warning("⚠️ 無資產資料。")
         else:
-            st.success("🎉 恭喜！目前防禦矩陣無高風險紅燈。")
-            st.link_button("前往 SecPaaS 資安地圖", SECPAAS_URL)
+            st.success("🎉 無高風險紅燈。")
+            st.link_button("前往 SecPaaS", SECPAAS_URL)
 
     st.write("")
-    if st.button("🔄 重新盤點 (回到首頁)", use_container_width=True):
+    if st.button("🔄 重新盤點", use_container_width=True):
         st.session_state.current_page = "1. 資產盤點"
         st.rerun()
