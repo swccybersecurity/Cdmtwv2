@@ -8,29 +8,29 @@ st.set_page_config(page_title="Taiwan CDM 戰情室 Pro", layout="wide")
 
 # --- 核心資料庫：台灣資安廠商清單 (作為預覽與 AI 推薦基礎) ---
 solutions_db = {
-    ("裝置", "識別"): ["一休資訊", "台達電子", "思邦科技", "瑞恩資訊", "中芯數據", "中華龍網"],
-    ("裝置", "保護"): ["三甲科技", "安碁資訊", "勤業眾信", "趨勢科技", "奧義智慧"],
-    ("裝置", "偵測"): ["元盾資安", "伊雲谷", "動力安全", "誠雲科技"],
+    ("裝置", "識別"): ["一休資訊", "台達電子", "思邦科技", "瑞恩資訊"],
+    ("裝置", "保護"): ["三甲科技", "安碁資訊", "勤業眾信", "趨勢科技"],
+    ("裝置", "偵測"): ["元盾資安", "伊雲谷", "動力安全"],
     ("裝置", "應變"): ["中芯數據", "元盾資安", "安碁資訊"],
     ("裝置", "復原"): ["扇原科技", "肇真數位"],
     
-    ("應用程式", "識別"): ["又碩電腦", "元盾資安", "系微", "保華資安"],
-    ("應用程式", "保護"): ["三甲科技", "台眾電腦", "安侯企管", "瑞恩資訊"],
+    ("應用程式", "識別"): ["又碩電腦", "元盾資安", "系微"],
+    ("應用程式", "保護"): ["三甲科技", "台眾電腦", "安侯企管"],
     ("應用程式", "偵測"): ["安碁資訊", "鼎原科技"],
-    ("應用程式", "應變"): ["中芯數據", "宏基資訊", "動力安全"],
+    ("應用程式", "應變"): ["中芯數據", "宏基資訊"],
     ("應用程式", "復原"): ["安碁資訊"],
 
     ("網路", "識別"): ["三甲科技", "安碁資訊", "承映資訊"],
-    ("網路", "保護"): ["一休資訊", "台眾電腦", "池安量子", "威碩系統"],
+    ("網路", "保護"): ["一休資訊", "台眾電腦", "池安量子"],
     ("網路", "偵測"): ["中飛科技", "思邦科技", "雲智維"],
-    ("網路", "應變"): ["三甲科技", "元盾資安", "如梭世代"],
+    ("網路", "應變"): ["三甲科技", "元盾資安"],
     ("網路", "復原"): ["如梭世代", "動力安全"],
 
     ("資料", "識別"): ["台眾電腦", "安碁資訊", "中華電信"],
     ("資料", "保護"): ["三甲科技", "台灣信威", "帝璽智慧"],
     ("資料", "偵測"): ["安碁資訊"],
     ("資料", "應變"): ["三甲科技", "元盾資安"],
-    ("資料", "復原"): ["三甲科技", "云碩科技", "華碩雲端"],
+    ("資料", "復原"): ["三甲科技", "云碩科技"],
 
     ("使用者", "識別"): ["一休資訊", "帝濶智慧", "全球系統"],
     ("使用者", "保護"): ["又碩電腦", "全域科技", "希臘智慧"],
@@ -40,8 +40,9 @@ solutions_db = {
 }
 
 # --- 初始化 Session State ---
+# 注意：這裡將 '皇冠寶石' 改為 '關鍵資產'
 if 'assets' not in st.session_state:
-    st.session_state.assets = pd.DataFrame(columns=["資產名稱", "類別", "皇冠寶石"])
+    st.session_state.assets = pd.DataFrame(columns=["資產名稱", "類別", "關鍵資產"])
 if 'assessments' not in st.session_state:
     st.session_state.assessments = {}
 if 'current_page' not in st.session_state:
@@ -56,9 +57,9 @@ if page_selection != st.session_state.current_page:
     st.session_state.current_page = page_selection
     st.rerun()
 
-# --- 輔助函式：生成 Excel (支援空白或範例) ---
+# --- 輔助函式：生成 Excel (修正欄位名稱) ---
 def create_template_excel(mode="empty"):
-    columns = ["資產名稱", "類別", "皇冠寶石"]
+    columns = ["資產名稱", "類別", "關鍵資產"]
     
     if mode == "example":
         # === 生成 50 筆測試資料 ===
@@ -66,10 +67,10 @@ def create_template_excel(mode="empty"):
         data = []
         
         for cat in categories:
-            for i in range(1, 11): # 每類產生 10 筆，共 50 筆
-                is_crown = "是" if random.random() < 0.2 else "否" # 20% 機率為皇冠
+            for i in range(1, 11): 
+                # 20% 機率為關鍵資產
+                is_critical = "是" if random.random() < 0.2 else "否"
                 
-                # 產生擬真的資產名稱
                 if cat == "裝置":
                     name = f"員工筆電_{random.randint(100,999)}" if i > 3 else f"核心伺服器_{i:02d}"
                 elif cat == "應用程式":
@@ -77,25 +78,23 @@ def create_template_excel(mode="empty"):
                 elif cat == "網路":
                     name = f"防火牆_{i:02d}" if i < 3 else f"辦公區Switch_{i:02d}"
                 elif cat == "資料":
-                    name = f"客戶個資DB_{i}" if is_crown == "是" else f"日常備份_{i}"
-                else: # 使用者
+                    name = f"客戶個資DB_{i}" if is_critical == "是" else f"日常備份_{i}"
+                else: 
                     name = f"行政人員_{i:02d}" if i > 2 else f"系統管理員_{i:02d}"
                     
-                data.append([name, cat, is_crown])
+                data.append([name, cat, is_critical])
         
         df = pd.DataFrame(data, columns=columns)
     else:
-        # === 生成僅有標題的空白資料 ===
         df = pd.DataFrame(columns=columns)
 
-    # 寫入 Buffer
     buffer = io.BytesIO()
     with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         df.to_excel(writer, index=False, sheet_name='資產清單')
     buffer.seek(0)
     return buffer
 
-# --- 核心邏輯函數：計算 CDM 格子狀態 ---
+# --- 核心邏輯函數：計算 CDM 格子狀態 (修正邏輯) ---
 def calculate_cell_status(category, function):
     df = st.session_state.assets
     if df.empty: return "no_asset", 0, []
@@ -104,12 +103,12 @@ def calculate_cell_status(category, function):
     if related_assets.empty: return "no_asset", 0, []
 
     scores = []
-    has_crown_risk = False
+    has_critical_risk = False  # 變數名稱更新
     details = []
 
     for index, row in related_assets.iterrows():
         asset_name = row['資產名稱']
-        is_crown = row['皇冠寶石']
+        is_critical = row['關鍵資產'] # 讀取新欄位
         key = (asset_name, function)
         
         score = st.session_state.assessments.get(key, 0)
@@ -117,14 +116,16 @@ def calculate_cell_status(category, function):
         if score > 0:
             scores.append(score)
             details.append(f"{asset_name}: Tier {score}")
-            if is_crown and score < 3:
-                has_crown_risk = True
+            # 如果是關鍵資產，且防護等級低於 Tier 3 (即 < 50%)，視為高風險
+            if is_critical and score < 3:
+                has_critical_risk = True
     
     if not scores: return "not_assessed", 0, []
 
-    if has_crown_risk: return "crown_risk", 1, details
+    if has_critical_risk: return "critical_risk", 1, details # 狀態名稱更新
     
     avg_score = sum(scores) / len(scores)
+    # 根據四原則 (百分比概念)
     if avg_score < 1.5: return "tier-1", 1, details
     elif avg_score < 2.5: return "tier-2", 2, details
     elif avg_score < 3.5: return "tier-3", 3, details
@@ -142,8 +143,6 @@ if st.session_state.current_page == "1. 資產盤點":
         
         with col_dl:
             st.markdown("#### 1. 取得格式")
-            st.caption("選擇下載：")
-            
             b1, b2 = st.columns(2)
             with b1:
                 st.download_button(
@@ -170,44 +169,43 @@ if st.session_state.current_page == "1. 資產盤點":
                 try:
                     df_new = pd.read_excel(uploaded_file)
                     
-                    # 簡易檢查欄位
-                    required_cols = {"資產名稱", "類別", "皇冠寶石"}
+                    # 檢查欄位 (支援舊版 '皇冠寶石' 自動轉移，或新版 '關鍵資產')
+                    if "皇冠寶石" in df_new.columns:
+                        df_new.rename(columns={"皇冠寶石": "關鍵資產"}, inplace=True)
+                    
+                    required_cols = {"資產名稱", "類別", "關鍵資產"}
+                    
                     if not required_cols.issubset(df_new.columns):
                         st.error(f"❌ 格式錯誤！缺少欄位：{required_cols}")
                     else:
-                        st.info(f"偵測到 {len(df_new)} 筆資產資料。")
-                        
                         if st.button("✅ 確認匯入 (覆蓋)", type="primary"):
-                            # 資料清洗：皇冠寶石轉 Boolean
-                            def parse_crown(val):
+                            # 資料清洗
+                            def parse_bool(val):
                                 val_str = str(val).lower().strip()
                                 return val_str in ["yes", "y", "是", "true", "1"]
                             
-                            df_new["皇冠寶石"] = df_new["皇冠寶石"].apply(parse_crown)
+                            df_new["關鍵資產"] = df_new["關鍵資產"].apply(parse_bool)
                             
-                            # 資料清洗：類別防呆
                             valid_cats = ["裝置", "應用程式", "網路", "資料", "使用者"]
                             df_new["類別"] = df_new["類別"].apply(lambda x: x if x in valid_cats else "裝置")
 
-                            # 更新 Session State (覆蓋)
                             st.session_state.assets = df_new
-                            st.session_state.assessments = {} # 清空舊評分
-                            
-                            st.success("🎉 匯入成功！資料已更新。")
+                            st.session_state.assessments = {} 
+                            st.success("🎉 匯入成功！")
                             st.rerun()
-                            
                 except Exception as e:
                     st.error(f"讀取失敗：{e}")
 
     st.divider()
 
-    # --- 區塊 B: 手動新增 ---
+    # --- 區塊 B: 手動新增 (UI調整) ---
     st.subheader("✍️ 手動新增資產")
     with st.container():
         col1, col2, col3, col4 = st.columns([3, 2, 2, 1])
         with col1: asset_name = st.text_input("資產名稱", placeholder="例: 核心資料庫")
         with col2: asset_type = st.selectbox("類別", ["裝置", "應用程式", "網路", "資料", "使用者"])
-        with col3: is_crown = st.checkbox("👑 皇冠寶石?", help="勾選代表此資產極為重要")
+        # 這裡改用您建議的更直觀的描述
+        with col3: is_critical = st.checkbox("🔥 設為關鍵資產", help="即 CDM 的『皇冠寶石』，指公司最重要的資產")
         with col4: 
             st.write("") 
             st.write("")
@@ -217,7 +215,8 @@ if st.session_state.current_page == "1. 資產盤點":
             if asset_name:
                 current_names = st.session_state.assets['資產名稱'].values if not st.session_state.assets.empty else []
                 if asset_name not in current_names:
-                    new_row = {"資產名稱": asset_name, "類別": asset_type, "皇冠寶石": is_crown}
+                    # 寫入 '關鍵資產'
+                    new_row = {"資產名稱": asset_name, "類別": asset_type, "關鍵資產": is_critical}
                     st.session_state.assets = pd.concat([st.session_state.assets, pd.DataFrame([new_row])], ignore_index=True)
                     st.success(f"已新增: {asset_name}")
                 else:
@@ -229,16 +228,17 @@ if st.session_state.current_page == "1. 資產盤點":
     if not st.session_state.assets.empty:
         st.subheader(f"📋 資產清單 ({len(st.session_state.assets)} 筆)")
         
-        def highlight_crown(val): return 'background-color: #ffd700; color: black' if val else ''
+        # 顯示時將 True 高亮為金色
+        def highlight_critical(val): return 'background-color: #ffd700; color: black; font-weight: bold' if val else ''
         
         st.dataframe(
-            st.session_state.assets.style.applymap(highlight_crown, subset=['皇冠寶石']), 
+            st.session_state.assets.style.applymap(highlight_critical, subset=['關鍵資產']), 
             use_container_width=True,
             hide_index=True
         )
         
         if st.button("🗑️ 清空所有資產"):
-            st.session_state.assets = pd.DataFrame(columns=["資產名稱", "類別", "皇冠寶石"])
+            st.session_state.assets = pd.DataFrame(columns=["資產名稱", "類別", "關鍵資產"])
             st.session_state.assessments = {}
             st.rerun()
     else:
@@ -255,26 +255,13 @@ if st.session_state.current_page == "1. 資產盤點":
 elif st.session_state.current_page == "2. 防禦診斷":
     st.header("🩺 步驟二：防禦成熟度診斷")
     
-    # --- 新增：評分指南 Popover (浮動視窗) ---
-    with st.popover("📖 打開評分指南 (Cheatsheet)", use_container_width=True):
-        st.markdown("### 🔍 NIST CSF 五大功能定義")
+    with st.expander("📊 評分標準說明 (依防護覆蓋率)", expanded=True):
         st.markdown("""
-        * **識別 (Identify)**：我知道我有什麼資產，以及風險在哪。
-        * **保護 (Protect)**：我有裝鎖、裝防毒，讓駭客打不進來。
-        * **偵測 (Detect)**：如果駭客進來了，我能馬上發現警告。
-        * **應變 (Respond)**：發現被駭，我知道該怎麼止血、通報。
-        * **復原 (Recover)**：出事後，我能把資料救回來，恢復營運。
-        """)
-        st.divider()
-        st.markdown("### 📊 成熟度評分標準 (Tier 1-4)")
-        st.markdown("""
-        | 分數 | 等級 | 定義說明 |
-        | :---: | :--- | :--- |
-        | **0** | **N/A** | **不適用** (無此功能需求) |
-        | **1** | **Tier 1 (被動)** | **有做，但無章法**。<br>通常是發生問題才處理，沒有正式規範。 |
-        | **2** | **Tier 2 (部分)** | **有流程，但未全面落實**。<br>知道該怎麼做，但依賴特定人員，沒寫成SOP。 |
-        | **3** | **Tier 3 (標準)** | **SOP 標準化**。<br>有白紙黑字規定，且全公司都照著做。 |
-        | **4** | **Tier 4 (自動)** | **數據驅動與自動化**。<br>系統能自動阻擋攻擊，並持續優化防禦。 |
+        * **0 (N/A)**: 不適用。
+        * **Tier 1 (< 25%)**: 🔴 **低度防護**。無防護或僅有少數安裝，且無SOP。
+        * **Tier 2 (25-50%)**: 🟡 **基礎防護**。有設備但流程未標準化，依賴人員記憶。
+        * **Tier 3 (50-75%)**: 🟢 **標準防護**。有白紙黑字 SOP，且 75% 資產已受控。
+        * **Tier 4 (> 75%)**: 🏆 **進階防護**。高度自動化偵測與回應。
         """)
 
     target_category = st.selectbox("請選擇要評估的類別：", ["裝置", "應用程式", "網路", "資料", "使用者"])
@@ -284,7 +271,7 @@ elif st.session_state.current_page == "2. 防禦診斷":
     if assets_in_cat.empty:
         st.warning(f"⚠️ 尚未建立「{target_category}」類別的資產，請回上一步新增。")
     else:
-        st.info(f"正在評估 {len(assets_in_cat)} 項資產。請點擊上方指南參考評分標準。")
+        st.info(f"正在評估 {len(assets_in_cat)} 項資產。")
         
         tabs = st.tabs(["識別 (ID)", "保護 (PR)", "偵測 (DE)", "應變 (RS)", "復原 (RC)"])
         functions = ["識別", "保護", "偵測", "應變", "復原"]
@@ -303,8 +290,9 @@ elif st.session_state.current_page == "2. 防禦診斷":
 
                 for idx, row in assets_in_cat.iterrows():
                     asset = row['資產名稱']
-                    is_crown = row['皇冠寶石']
-                    crown_label = "👑" if is_crown else ""
+                    is_critical = row['關鍵資產']
+                    # 圖示改為火或是鑽石
+                    critical_label = "🔥" if is_critical else ""
                     
                     key = (asset, func)
                     current_val = st.session_state.assessments.get(key, 0)
@@ -312,23 +300,24 @@ elif st.session_state.current_page == "2. 防禦診斷":
                     with st.container():
                         c1, c2 = st.columns([1, 2])
                         with c1:
-                            st.markdown(f"**{asset}** {crown_label}")
+                            st.markdown(f"**{asset}** {critical_label}")
+                            if is_critical:
+                                st.caption("關鍵資產")
                         with c2:
-                            score = st.radio(
-                                f"成熟度 ({asset}-{func})",
+                            # 使用 Slider 讓百分比更直觀
+                            score = st.select_slider(
+                                f"防護覆蓋率 ({asset}-{func})",
                                 options=[0, 1, 2, 3, 4],
-                                index=current_val,
+                                value=current_val,
                                 format_func=lambda x: {
                                     0: "⚪ N/A",
-                                    1: "🔴 Tier 1",
-                                    2: "🟡 Tier 2",
-                                    3: "🟢 Tier 3",
-                                    4: "🏆 Tier 4"
+                                    1: "🔴 <25% (低)",
+                                    2: "🟡 25-50% (中)",
+                                    3: "🟢 50-75% (高)",
+                                    4: "🏆 >75% (全)"
                                 }[x],
-                                key=f"radio_{asset}_{func}",
-                                horizontal=True,
-                                label_visibility="collapsed",
-                                help="請參考上方「評分指南」定義分數"
+                                key=f"slider_{asset}_{func}",
+                                label_visibility="collapsed"
                             )
                             if score != current_val:
                                 st.session_state.assessments[key] = score
@@ -354,21 +343,28 @@ elif st.session_state.current_page == "3. 風險戰情室":
     functions = ["識別", "保護", "偵測", "應變", "復原"]
     recommendation_list = []
 
-    # --- HTML 矩陣 ---
+    # --- HTML 矩陣 (CSS 優化避免 br) ---
     html_code = """
     <style>
-        table {width: 100%; border-collapse: separate; border-spacing: 3px;}
-        th {background-color: #333; color: white; padding: 8px; font-size: 0.85em;}
+        table {width: 100%; border-collapse: separate; border-spacing: 4px;}
+        th {background-color: #262730; color: white; padding: 10px; font-size: 0.9em;}
         td {
-            padding: 5px; height: 70px; text-align: center; 
+            padding: 8px; height: 70px; text-align: center; vertical-align: middle;
             border-radius: 6px; font-weight: bold; font-size: 0.9em; color: black;
-            box-shadow: 1px 1px 3px rgba(0,0,0,0.1);
+            box-shadow: 1px 1px 2px rgba(0,0,0,0.1);
         }
         .cat-head {background-color: #555; color: white; width: 15%;}
         
         .s-no-asset {background-color: #f0f2f6; color: #ccc; border: 1px dashed #ddd;}
         .s-pending {background-color: #ffffff; color: #888; border: 1px solid #ddd;}
-        .s-crown-risk {background-color: #ff4b4b; color: white; border: 3px solid #ffd700; animation: pulse 2s infinite;}
+        
+        /* 關鍵資產風險樣式 */
+        .s-critical-risk {
+            background-color: #ff4b4b; color: white; 
+            border: 3px solid #ffd700; 
+            animation: pulse 2s infinite;
+        }
+        
         .s-t1 {background-color: #ffcccc; border: 1px solid red;}
         .s-t2 {background-color: #fff3cd; border: 1px solid orange;}
         .s-t3 {background-color: #d1e7dd; border: 1px solid green;}
@@ -387,7 +383,8 @@ elif st.session_state.current_page == "3. 風險戰情室":
         for func in functions:
             status, tier, details = calculate_cell_status(cat, func)
             
-            if status in ["crown_risk", "tier-1", "tier-2"]:
+            # 這裡把 critical_risk 加入推薦清單
+            if status in ["critical_risk", "tier-1", "tier-2"]:
                 recommendation_list.append((cat, func, status))
 
             css_class = ""
@@ -399,14 +396,16 @@ elif st.session_state.current_page == "3. 風險戰情室":
             elif status == "not_assessed":
                 css_class = "s-pending"
                 display_text = "?"
-            elif status == "crown_risk":
-                css_class = "s-crown-risk"
-                display_text = "⚠️ RISK"
+            elif status == "critical_risk":
+                css_class = "s-critical-risk"
+                display_text = "🔥 關鍵<br>風險" # 這裡手動換行比較美觀，但 CSS 支援
             else:
                 css_class = f"s-t{tier}"
                 display_text = f"Tier {tier}"
             
-            html_code += f"<td class='{css_class}' title='{', '.join(details)}'>{display_text}</td>"
+            # 為了避免 title 屬性導致的亂碼，我們不放 title，或是確保 details 是純文字
+            clean_details = "&#10;".join(details) # HTML tooltip 換行符
+            html_code += f"<td class='{css_class}' title='{clean_details}'>{display_text}</td>"
         html_code += "</tr>"
     html_code += "</table>"
     
@@ -422,32 +421,32 @@ elif st.session_state.current_page == "3. 風險戰情室":
         st.write(f"共偵測到 **{len(recommendation_list)}** 個弱點：")
         
         for cat, func, status in recommendation_list:
-            if status == "crown_risk":
-                label = "🚨 皇冠風險"
-                desc = "關鍵資產防護不足，需立即改善！"
+            if status == "critical_risk":
+                label = "🔥 關鍵資產告急"
+                desc = "重要資產防護低於標準 (Tier 3)，風險極高！"
             elif status == "tier-1":
                 label = "🔴 Tier 1 缺口"
-                desc = "缺乏基礎防禦。"
+                desc = "防護覆蓋率 < 25%，形同裸奔。"
             else:
                 label = "🟡 Tier 2 強化"
-                desc = "標準化不足。"
+                desc = "防護覆蓋率 < 50%，需建立標準流程 (SOP)。"
             
             with st.expander(f"{label}：[{cat} - {func}]", expanded=True):
                 c1, c2 = st.columns([3, 1])
                 with c1:
                     vendors = solutions_db.get((cat, func), [])
-                    vendor_txt = "、".join(vendors[:4]) + ("..." if len(vendors)>4 else "") if vendors else "請查詢"
+                    vendor_txt = "、".join(vendors[:4]) + ("..." if len(vendors)>4 else "") if vendors else "請查詢 SecPaaS"
                     st.markdown(f"**診斷：** {desc}")
-                    st.markdown(f"👀 **廠商參考：** {vendor_txt}")
+                    st.markdown(f"👀 **建議廠商：** {vendor_txt}")
                 with c2:
                     st.write("")
-                    st.link_button("🔍 找廠商", url=SECPAAS_URL)
+                    st.link_button("🔍 找解方", url=SECPAAS_URL)
     else:
         if st.session_state.assets.empty:
             st.warning("⚠️ 無資產資料。")
         else:
-            st.success("🎉 無高風險紅燈。")
-            st.link_button("前往 SecPaaS", SECPAAS_URL)
+            st.success("🎉 恭喜！無重大風險紅燈。")
+            st.link_button("前往 SecPaaS 商城", SECPAAS_URL)
 
     st.write("")
     if st.button("🔄 重新盤點", use_container_width=True):
