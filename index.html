@@ -157,6 +157,21 @@
         .page.active { display:block; }
 
         .hidden { display:none !important; }
+
+        /* ── Batch row ── */
+        .batch-row { display:flex; align-items:center; gap:10px; padding:10px 0 14px; border-bottom:2px solid #333; margin-bottom:10px; flex-wrap:wrap; }
+        .batch-label { font-size:.85em; color:#aaa; white-space:nowrap; }
+
+        /* ── Sidebar tools ── */
+        .tool-sep { border:none; border-top:1px solid #2a2c3a; margin:10px 0 6px; }
+        .nav-tool { display:block; width:100%; text-align:left; padding:8px 14px; border:none; border-radius:8px; cursor:pointer; background:transparent; color:#aaa; font-size:.84em; transition:background .15s; }
+        .nav-tool:hover { background:#2a2c3a; color:#fafafa; }
+
+        /* ── Snapshot list ── */
+        .snap-item { background:#1a1c26; border:1px solid #2a2c3a; border-radius:8px; padding:12px 14px; margin-bottom:10px; }
+        .snap-meta { font-size:.82em; color:#888; margin-top:3px; }
+        .snap-matrix { display:grid; grid-template-columns:repeat(6,1fr); gap:2px; margin-top:10px; font-size:.72em; }
+        .snap-cell { padding:3px 2px; text-align:center; border-radius:3px; }
     </style>
 </head>
 <body>
@@ -167,6 +182,15 @@
     <button class="nav-btn active" id="nav1" onclick="goToPage(1)">1. 資產盤點</button>
     <button class="nav-btn" id="nav2" onclick="goToPage(2)">2. 防禦診斷</button>
     <button class="nav-btn" id="nav3" onclick="goToPage(3)">3. 風險戰情室</button>
+    <button class="nav-btn" id="nav4" onclick="goToPage(4)">4. 歷史快照</button>
+    <hr class="tool-sep">
+    <button class="nav-tool" onclick="backupData()">💾 備份資料</button>
+    <label class="nav-tool" style="cursor:pointer;">📂 還原資料
+        <input type="file" id="restoreInput" accept=".json" style="display:none" onchange="restoreData(event)">
+    </label>
+    <button class="nav-tool" onclick="saveSnapshot()">📷 儲存快照</button>
+    <hr class="tool-sep">
+    <button class="nav-tool" onclick="exportReport()">📄 匯出報告</button>
 </div>
 
 <!-- Main -->
@@ -286,6 +310,16 @@
         </div>
     </div>
 
+    <!-- ======================== Page 4 ======================== -->
+    <div class="page" id="page4">
+        <h1>📷 歷史快照</h1>
+        <div class="card">
+            <p style="font-size:.88em;color:#aaa;margin-bottom:12px;">每次按「📷 儲存快照」會在此留下一筆紀錄（最多保留 20 筆），可隨時還原或查看當時的矩陣狀態。</p>
+            <button class="btn btn-primary" onclick="saveSnapshot()">📷 立即儲存當前快照</button>
+        </div>
+        <div id="snapshotList"></div>
+    </div>
+
 </div><!-- /main -->
 
 <script>
@@ -323,6 +357,7 @@ function goToPage(n) {
     if (n===1) renderList();
     if (n===2) renderAssess();
     if (n===3) renderDashboard();
+    if (n===4) renderHistory();
 }
 
 // ============================================================
@@ -493,6 +528,13 @@ function renderAssess() {
         const pct = assets.length ? Math.round(assessed/assets.length*100) : 0;
 
         h += `<div class="tab-pane ${fi===0?'active':''}" id="tp-${fi}">`;
+        h += `<div class="batch-row">
+          <span class="batch-label">批次套用 [${esc(FUNC_LABELS[func])}]：</span>
+          <select id="batch-sel-${fi}" class="score-select" style="max-width:200px;">`;
+        for (let s=0; s<=4; s++) h += `<option value="${s}">${esc(SCORE_LABELS[s])}</option>`;
+        h += `</select>
+          <button class="btn btn-secondary" onclick="batchSetScore(document.getElementById('batch-sel-${fi}').value,'${esc(func)}',${fi})">套用至全部資產</button>
+        </div>`;
         h += `<div class="progress-text">完成度: ${pct}%</div>`;
         h += `<div class="progress-bar"><div class="progress-fill" id="pf-${fi}" style="width:${pct}%"></div></div>`;
 
@@ -659,6 +701,238 @@ function renderDashboard() {
 function toggleExp(id) {
     document.getElementById(id+'b').classList.toggle('open');
     document.getElementById(id+'a').classList.toggle('open');
+}
+
+// ============================================================
+// Batch score
+// ============================================================
+function batchSetScore(score, func, fi) {
+    const cat = document.getElementById('assessCat').value;
+    S.assets.filter(a => a.category===cat).forEach(a => {
+        S.assessments[`${a.name}|${func}`] = parseInt(score);
+    });
+    save();
+    renderAssess();
+    switchTab(fi);
+}
+
+// ============================================================
+// Backup / Restore
+// ============================================================
+function backupData() {
+    const data = JSON.stringify({...S, _exportedAt: new Date().toISOString()}, null, 2);
+    const blob = new Blob([data], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const ts = new Date().toLocaleDateString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'');
+    a.href = url; a.download = `CDM備份_${ts}.json`; a.click();
+    URL.revokeObjectURL(url);
+}
+
+function restoreData(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        try {
+            const data = JSON.parse(ev.target.result);
+            if (!Array.isArray(data.assets) || typeof data.assessments !== 'object') {
+                alert('❌ 檔案格式不正確，請確認是 CDM 備份檔。'); return;
+            }
+            if (!confirm(`確定還原？\n資產：${data.assets.length} 筆\n評估：${Object.keys(data.assessments).length} 筆\n\n⚠️ 目前資料將被覆蓋。`)) return;
+            S.assets = data.assets;
+            S.assessments = data.assessments;
+            save();
+            goToPage(1);
+            e.target.value = '';
+            flash('addMsg','success','✅ 還原成功！');
+        } catch(err) { alert('還原失敗：'+err.message); }
+    };
+    reader.readAsText(file);
+}
+
+// ============================================================
+// Snapshots
+// ============================================================
+function _loadSnaps() { try { return JSON.parse(localStorage.getItem('cdm_snapshots')||'[]'); } catch { return []; } }
+function _saveSnaps(s) { try { localStorage.setItem('cdm_snapshots', JSON.stringify(s)); } catch(e) {} }
+
+function saveSnapshot() {
+    const snaps = _loadSnaps();
+    const now = new Date();
+    const label = now.toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+    snaps.unshift({
+        savedAt: now.toISOString(), label,
+        assetCount: S.assets.length,
+        assessCount: Object.values(S.assessments).filter(v=>v>0).length,
+        state: JSON.parse(JSON.stringify(S))
+    });
+    if (snaps.length > 20) snaps.pop();
+    _saveSnaps(snaps);
+    if (document.getElementById('snapshotList')) renderHistory();
+    alert(`✅ 快照已儲存：${label}`);
+}
+
+function renderHistory() {
+    const snaps = _loadSnaps();
+    const el = document.getElementById('snapshotList');
+    if (!el) return;
+    if (!snaps.length) {
+        el.innerHTML = '<div class="alert alert-info">尚無快照。按「📷 儲存快照」建立第一筆紀錄。</div>';
+        return;
+    }
+    let h = '';
+    snaps.forEach((snap, i) => {
+        // mini matrix 6x6 (header + 5 funcs, header + 5 cats)
+        let mx = '<div class="snap-matrix">';
+        mx += `<div class="snap-cell" style="background:#262730;color:#777;"></div>`;
+        FUNCS.forEach(f => { mx += `<div class="snap-cell" style="background:#262730;color:#aaa;">${f.charAt(0)}</div>`; });
+        CATS.forEach(cat => {
+            mx += `<div class="snap-cell" style="background:#3d3f50;color:#ddd;">${cat.charAt(0)}</div>`;
+            FUNCS.forEach(func => {
+                const assets = snap.state.assets.filter(a=>a.category===cat);
+                if (!assets.length) { mx += `<div class="snap-cell s-no-asset">·</div>`; return; }
+                const scores = assets.map(a=>snap.state.assessments[`${a.name}|${func}`]||0).filter(s=>s>0);
+                if (!scores.length) { mx += `<div class="snap-cell s-pending">?</div>`; return; }
+                const critRisk = assets.some(a=>a.isCritical&&(snap.state.assessments[`${a.name}|${func}`]||0)<3&&(snap.state.assessments[`${a.name}|${func}`]||0)>0);
+                if (critRisk) { mx += `<div class="snap-cell s-critical-risk" style="animation:none;">!</div>`; return; }
+                const avg = scores.reduce((a,b)=>a+b,0)/scores.length;
+                const t = avg<1.5?1:avg<2.5?2:avg<3.5?3:4;
+                mx += `<div class="snap-cell s-t${t}">T${t}</div>`;
+            });
+        });
+        mx += '</div>';
+
+        h += `<div class="snap-item">
+          <div style="display:flex;justify-content:space-between;align-items:center;">
+            <div>
+              <div style="font-weight:600;">${esc(snap.label)}</div>
+              <div class="snap-meta">資產 ${snap.assetCount} 筆｜評估 ${snap.assessCount} 筆</div>
+            </div>
+            <div style="display:flex;gap:8px;">
+              <button class="btn btn-secondary" onclick="loadSnapshot(${i})">🔄 還原</button>
+              <button class="btn btn-danger" onclick="deleteSnapshot(${i})">🗑️</button>
+            </div>
+          </div>
+          ${mx}
+        </div>`;
+    });
+    el.innerHTML = h;
+}
+
+function loadSnapshot(idx) {
+    const snaps = _loadSnaps();
+    const snap = snaps[idx];
+    if (!snap) return;
+    if (!confirm(`確定還原至快照「${snap.label}」？\n目前未儲存的變更將遺失。`)) return;
+    S.assets = snap.state.assets;
+    S.assessments = snap.state.assessments;
+    save();
+    goToPage(1);
+}
+
+function deleteSnapshot(idx) {
+    const snaps = _loadSnaps();
+    if (!confirm(`確定刪除快照「${snaps[idx]?.label}」？`)) return;
+    snaps.splice(idx, 1);
+    _saveSnaps(snaps);
+    renderHistory();
+}
+
+// ============================================================
+// Export report
+// ============================================================
+function exportReport() {
+    const ts = new Date().toLocaleString('zh-TW',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+    let matrixRows = '';
+    CATS.forEach(cat => {
+        let cells = `<td style="background:#e8eaf0;font-weight:600;padding:8px 12px;border:1px solid #ccc;">${cat}</td>`;
+        FUNCS.forEach(func => {
+            const {status, tier, details} = calcCell(cat, func);
+            let bg, txt, color='#111';
+            switch(status) {
+                case 'no_asset':      bg='#f5f5f5'; txt='N/A'; color='#bbb'; break;
+                case 'not_assessed':  bg='#fff9e6'; txt='未評估'; color='#888'; break;
+                case 'critical_risk': bg='#cc2222'; txt='🔥 關鍵\n風險'; color='white'; break;
+                case 'tier-1':        bg='#ffe0e0'; txt='Tier 1'; break;
+                case 'tier-2':        bg='#fff5d0'; txt='Tier 2'; break;
+                case 'tier-3':        bg='#d4f5e2'; txt='Tier 3'; break;
+                case 'tier-4':        bg='#d0eaff'; txt='Tier 4'; break;
+                default: bg='#fff'; txt='';
+            }
+            const tip = details.join('&#10;');
+            cells += `<td title="${tip}" style="background:${bg};color:${color};padding:8px;text-align:center;border:1px solid #ccc;font-weight:600;white-space:pre-line;">${txt}</td>`;
+        });
+        matrixRows += `<tr>${cells}</tr>`;
+    });
+
+    const recList = [];
+    CATS.forEach(cat => FUNCS.forEach(func => {
+        const {status} = calcCell(cat, func);
+        if (['critical_risk','tier-1','tier-2'].includes(status)) recList.push({cat, func, status});
+    }));
+
+    let riskRows = recList.length === 0
+        ? '<tr><td colspan="3" style="text-align:center;color:green;padding:14px;">✅ 無重大風險</td></tr>'
+        : recList.map(({cat,func,status}) => {
+            let level, desc;
+            if (status==='critical_risk') { level='🔥 關鍵告急'; desc='關鍵資產防護 < Tier 3，風險極高'; }
+            else if (status==='tier-1')   { level='🔴 嚴重缺口'; desc='防護覆蓋率 < 25%，形同裸奔'; }
+            else                           { level='🟡 需強化';   desc='防護覆蓋率 < 50%，需建立標準 SOP'; }
+            return `<tr>
+              <td style="padding:8px 12px;border:1px solid #eee;">${cat}</td>
+              <td style="padding:8px 12px;border:1px solid #eee;">${func}</td>
+              <td style="padding:8px 12px;border:1px solid #eee;">${level}：${desc}</td>
+            </tr>`;
+          }).join('');
+
+    const assetRows = S.assets.map(a => `<tr>
+        <td style="padding:7px 12px;border:1px solid #eee;">${a.name}</td>
+        <td style="padding:7px 12px;border:1px solid #eee;">${a.category}</td>
+        <td style="padding:7px 12px;border:1px solid #eee;text-align:center;">${a.isCritical?'🔥 是':'否'}</td>
+    </tr>`).join('');
+
+    const html = `<!DOCTYPE html><html lang="zh-TW"><head><meta charset="UTF-8">
+<title>CDM 防禦成熟度評估報告</title>
+<style>
+  body{font-family:'Microsoft JhengHei','Segoe UI',sans-serif;color:#111;padding:32px;max-width:960px;margin:0 auto;}
+  h1{font-size:1.6em;color:#003366;border-bottom:3px solid #003366;padding-bottom:8px;margin-bottom:6px;}
+  h2{font-size:1.05em;color:#003366;border-left:4px solid #003366;padding-left:10px;margin:28px 0 10px;}
+  table{width:100%;border-collapse:collapse;margin-bottom:8px;}
+  th{background:#003366;color:white;padding:10px 12px;text-align:center;border:1px solid #003366;}
+  .meta{font-size:.88em;color:#666;margin-bottom:28px;line-height:2;}
+  .print-btn{display:block;margin:28px auto 0;padding:10px 28px;background:#003366;color:white;border:none;border-radius:6px;cursor:pointer;font-size:.95em;}
+  .footer{text-align:center;margin-top:20px;font-size:.76em;color:#aaa;}
+  @media print{.print-btn,.footer{display:none;}}
+</style></head><body>
+<h1>CDM 防禦成熟度評估報告</h1>
+<div class="meta">
+  評估日期：${ts}　　資產總數：${S.assets.length} 筆　　已評估：${Object.values(S.assessments).filter(v=>v>0).length} 筆　　風險項目：${recList.length} 項
+</div>
+
+<h2>一、防禦成熟度矩陣</h2>
+<table><thead><tr>
+  <th style="width:14%;">類別 \\ 功能</th>
+  ${FUNCS.map(f=>`<th>${f}</th>`).join('')}
+</tr></thead><tbody>${matrixRows}</tbody></table>
+
+<h2>二、風險摘要</h2>
+<table><thead><tr><th>類別</th><th>功能</th><th>狀態說明</th></tr></thead>
+<tbody>${riskRows}</tbody></table>
+
+<h2>三、資產清單（共 ${S.assets.length} 筆）</h2>
+<table><thead><tr><th>資產名稱</th><th>類別</th><th>關鍵資產</th></tr></thead>
+<tbody>${assetRows}</tbody></table>
+
+<button class="print-btn" onclick="window.print()">🖨️ 列印 / 儲存為 PDF</button>
+<p class="footer">由 Taiwan CDM 戰情室 Pro 產生</p>
+</body></html>`;
+
+    const win = window.open('', '_blank');
+    if (!win) { alert('請允許彈出視窗後再試。'); return; }
+    win.document.write(html);
+    win.document.close();
 }
 
 // ============================================================
