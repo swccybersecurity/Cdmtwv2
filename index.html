@@ -294,10 +294,10 @@
             <strong>📊 評分標準說明（依防護覆蓋率）</strong>
             <ul style="margin-top:8px;">
                 <li><strong>0 (N/A)</strong>：不適用。</li>
-                <li><strong>Tier 1 (&lt;25%)</strong>：🔴 低度防護。無防護或僅有少數安裝，且無SOP。</li>
-                <li><strong>Tier 2 (25-50%)</strong>：🟡 基礎防護。有設備但流程未標準化，依賴人員記憶。</li>
-                <li><strong>Tier 3 (50-75%)</strong>：🟢 標準防護。有白紙黑字 SOP，且 75% 資產已受控。</li>
-                <li><strong>Tier 4 (&gt;75%)</strong>：🏆 進階防護。高度自動化偵測與回應。</li>
+                <li><strong>Tier 4 (&lt;25%)</strong>：🔴 低度防護。無防護或僅有少數安裝，且無SOP。</li>
+                <li><strong>Tier 3 (25-50%)</strong>：🟡 基礎防護。有設備但流程未標準化，依賴人員記憶。</li>
+                <li><strong>Tier 2 (50-75%)</strong>：🟢 標準防護。有白紙黑字 SOP，且 75% 資產已受控。</li>
+                <li><strong>Tier 1 (&gt;75%)</strong>：🏆 進階防護。高度自動化偵測與回應。</li>
             </ul>
         </div>
 
@@ -356,7 +356,7 @@ function secpaasUrl(cat,func,kid){return `https://secpaas.org.tw/W_CDMList?cdm=$
 const CATS  = ["裝置","應用程式","網路","資料","使用者"];
 const FUNCS = ["識別","保護","偵測","應變","復原"];
 const FUNC_LABELS = {"識別":"識別 (ID)","保護":"保護 (PR)","偵測":"偵測 (DE)","應變":"應變 (RS)","復原":"復原 (RC)"};
-const SCORE_LABELS = {0:"⚪ N/A",1:"🔴 <25% (低)",2:"🟡 25-50% (中)",3:"🟢 50-75% (高)",4:"🏆 >75% (全)"};
+const SCORE_LABELS = {0:"⚪ N/A",1:"🔴 Tier 4 (<25%) 低度",2:"🟡 Tier 3 (25-50%) 基礎",3:"🟢 Tier 2 (50-75%) 標準",4:"🏆 Tier 1 (>75%) 進階"};
 const SECPAAS = "https://secpaas.org.tw/W_SecDocProduct";
 
 const SUBTYPES = {
@@ -663,7 +663,7 @@ function renderGovAssess() {
     let h = `<div class="gov-instr">
         <strong>📋 評估方式說明</strong><br>
         本項目評估依據廠商於「企業資安評等平台」完成之 <strong>42 題評級問卷</strong>結果，
-        由顧問依加權計算後選擇對應等級（A–E）。<br>
+        由評級結果顯示之等級選擇下方方塊。<br>
         <span style="color:#888;font-size:.92em;">分數換算（V2023.05後版）：A（90–100分）、B（80–90分）、C（70–80分）、D（60–70分）、E（0–60分）</span>
     </div>
     <div class="card">
@@ -731,7 +731,7 @@ function calcCell(cat, func) {
         const score = S.assessments[`${a.name}|${func}`] || 0;
         if (score > 0) {
             scores.push(score);
-            details.push(`${a.name}: Tier ${score}`);
+            details.push(`${a.name}: Tier ${5-score}`);
             if (a.isCritical && score < 3) critRisk = true;
         }
     });
@@ -766,7 +766,7 @@ function renderDashboard() {
                 case 'no_asset':      css='s-no-asset';      txt='·';            break;
                 case 'not_assessed':  css='s-pending';        txt='?';            break;
                 case 'critical_risk': css='s-critical-risk';  txt='🔥 關鍵\n風險'; break;
-                default:              css=`s-t${tier}`;       txt=`Tier ${tier}`; break;
+                default:              css=`s-t${tier}`;       txt=`Tier ${5-tier}`; break;
             }
             const tip = escAttr(details.join('\n'));
             const dispHtml = esc(txt).replace('\n','<br>');
@@ -821,9 +821,9 @@ function renderDashboard() {
         }
 
         let label, desc;
-        if (status==='critical_risk') { label='🔥 關鍵資產告急'; desc='重要資產防護低於標準 (Tier 3)，風險極高！'; }
-        else if (status==='tier-1')   { label='🔴 Tier 1 缺口';   desc='防護覆蓋率 < 25%，形同裸奔。'; }
-        else                           { label='🟡 Tier 2 強化';   desc='防護覆蓋率 < 50%，需建立標準流程 (SOP)。'; }
+        if (status==='critical_risk') { label='🔥 關鍵資產告急'; desc='重要資產防護低於標準 (Tier 2)，風險極高！'; }
+        else if (status==='tier-1')   { label='🔴 Tier 4 缺口';   desc='防護覆蓋率 < 25%，形同裸奔。'; }
+        else                           { label='🟡 Tier 3 強化';   desc='防護覆蓋率 < 50%，需建立標準流程 (SOP)。'; }
 
         const vendors = CDM_VENDORS[`${cat}|${func}`] || [];
         const code    = cdmCode(cat, func);
@@ -1038,10 +1038,10 @@ function exportReport() {
                 case 'no_asset':      bg='#f5f5f5'; txt='N/A'; color='#bbb'; break;
                 case 'not_assessed':  bg='#fff9e6'; txt='未評估'; color='#888'; break;
                 case 'critical_risk': bg='#cc2222'; txt='🔥 關鍵\n風險'; color='white'; break;
-                case 'tier-1':        bg='#ffe0e0'; txt='Tier 1'; break;
-                case 'tier-2':        bg='#fff5d0'; txt='Tier 2'; break;
-                case 'tier-3':        bg='#d4f5e2'; txt='Tier 3'; break;
-                case 'tier-4':        bg='#d0eaff'; txt='Tier 4'; break;
+                case 'tier-1':        bg='#ffe0e0'; txt='Tier 4'; break;
+                case 'tier-2':        bg='#fff5d0'; txt='Tier 3'; break;
+                case 'tier-3':        bg='#d4f5e2'; txt='Tier 2'; break;
+                case 'tier-4':        bg='#d0eaff'; txt='Tier 1'; break;
                 default: bg='#fff'; txt='';
             }
             const tip = details.join('&#10;');
@@ -1073,9 +1073,9 @@ function exportReport() {
             if (status==='gov') {
                 const gd = {C:'建議儘速強化資安治理能力，可導入顧問服務',D:'需立即採取行動改善資安治理架構',E:'請立即委請顧問介入，重建資安治理基礎'};
                 level=`⚠️ 治理等級 ${rg}`; desc=gd[rg];
-            } else if (status==='critical_risk') { level='🔥 關鍵告急'; desc='關鍵資產防護 < Tier 3，風險極高'; }
-            else if (status==='tier-1')   { level='🔴 嚴重缺口'; desc='防護覆蓋率 < 25%，形同裸奔'; }
-            else                           { level='🟡 需強化';   desc='防護覆蓋率 < 50%，需建立標準 SOP'; }
+            } else if (status==='critical_risk') { level='🔥 關鍵告急'; desc='關鍵資產防護 < Tier 2，風險極高'; }
+            else if (status==='tier-1')   { level='🔴 Tier 4 嚴重缺口'; desc='防護覆蓋率 < 25%，形同裸奔'; }
+            else                           { level='🟡 Tier 3 需強化';   desc='防護覆蓋率 < 50%，需建立標準 SOP'; }
             return `<tr>
               <td style="padding:8px 12px;border:1px solid #eee;">${cat}</td>
               <td style="padding:8px 12px;border:1px solid #eee;">${func}</td>
