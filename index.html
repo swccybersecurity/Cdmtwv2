@@ -980,10 +980,7 @@ function renderHistory() {
         const sg = snap.state.govGrade;
         const govSnapCss = !sg ? 's-pending' : (sg==='A'?'s-t4':sg==='B'?'s-t3':sg==='C'?'s-t2':sg==='D'?'s-t1':'s-critical-risk');
         mx += `<div class="snap-cell" style="background:#2a2040;color:#cc88ff;">治</div>`;
-        for (let fi=0; fi<5; fi++) {
-            if (fi===0) mx += `<div class="snap-cell ${govSnapCss}">${sg||'?'}</div>`;
-            else mx += `<div class="snap-cell s-no-asset"></div>`;
-        }
+        mx += `<div class="snap-cell ${govSnapCss}" style="grid-column:span 5;text-align:center;">${sg||'?'}</div>`;
         mx += '</div>';
 
         h += `<div class="snap-item">
