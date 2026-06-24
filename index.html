@@ -137,13 +137,14 @@
         /* ── Vendor logo grid ── */
         .logo-grid { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
         .logo-item { display:flex; align-items:center; justify-content:center;
-            width:72px; height:44px; background:#262730; border-radius:6px;
-            border:1px solid #333; overflow:hidden; transition:border-color .15s; }
-        .logo-item:hover { border-color:#ff4b4b; }
-        .logo-item img { max-width:68px; max-height:40px; object-fit:contain; }
-        .logo-more { display:inline-flex; align-items:center; justify-content:center;
-            width:72px; height:44px; background:#1a1c26; border:1px dashed #555;
-            border-radius:6px; color:#aaa; font-size:.75em; text-decoration:none; }
+            width:80px; height:48px; background:#fff; border-radius:6px;
+            border:1px solid #ccc; overflow:hidden; transition:border-color .15s, box-shadow .15s; }
+        .logo-item:hover { border-color:#ff4b4b; box-shadow:0 0 0 2px rgba(255,75,75,.25); }
+        .logo-item img { max-width:76px; max-height:44px; object-fit:contain; padding:2px; }
+        .logo-item.logo-hidden { display:none; }
+        .logo-more { display:inline-flex; align-items:center; justify-content:center; flex-direction:column;
+            width:80px; height:48px; background:#1a1c26; border:1px dashed #555;
+            border-radius:6px; color:#aaa; font-size:.75em; cursor:pointer; line-height:1.4; }
         .logo-more:hover { border-color:#ff4b4b; color:#fafafa; }
         .rec-meta { display:flex; justify-content:space-between; align-items:center; margin-top:14px; flex-wrap:wrap; gap:8px; }
 
@@ -322,7 +323,7 @@
         <h1>📊 步驟三：CDM 風險戰情室</h1>
         <div id="cdmMatrix" class="matrix-wrap"></div>
         <hr class="divider">
-        <h2>💊 智慧處方籤（AI 推薦 × SecPaaS）</h2>
+        <h2>🛡️ 臺灣資安防護矩陣地圖 推薦廠商</h2>
         <div id="recommendations"></div>
         <div style="margin-top:22px;">
             <button class="btn btn-secondary btn-full" onclick="goToPage(1)">🔄 重新盤點</button>
@@ -359,11 +360,11 @@ const SCORE_LABELS = {0:"⚪ N/A",1:"🔴 <25% (低)",2:"🟡 25-50% (中)",3:"�
 const SECPAAS = "https://secpaas.org.tw/W_SecDocProduct";
 
 const SUBTYPES = {
-    "裝置":     ["","伺服器","端點/PC","網路設備","儲存設備","IoT設備","行動裝置"],
+    "裝置":     ["","伺服器","端點/PC","網路設備","儲存設備","IoT設備","行動裝置","其他"],
     "應用程式": ["","Web應用","郵件系統","資料庫","ERP/業務系統","API服務","其他"],
     "網路":     ["","防火牆/IPS","交換器/路由器","VPN","負載均衡","DNS","其他"],
     "資料":     ["","個人資料","財務資料","機密/智財","備份資料","日誌","其他"],
-    "使用者":   ["","一般帳號","特權帳號","外部/廠商帳號","系統服務帳號"]
+    "使用者":   ["","一般帳號","特權帳號","外部/廠商帳號","系統服務帳號","其他"]
 };
 
 const GOV_VENDORS = [
@@ -681,23 +682,8 @@ function renderGovAssess() {
         const info = GRADE_INFO[grade];
         h += `<div class="alert ${info.alert}">${info.msg}</div>`;
         if (info.needsRec) {
-            const SHOW = 12, total = GOV_VENDORS.length;
-            h += `<h3 style="margin:16px 0 8px;">💊 建議參考廠商（資安治理強化）：</h3>
-                  <p style="font-size:.84em;color:#aaa;margin-bottom:10px;">共 ${total} 家廠商提供資安治理顧問與強化服務</p>
-                  <div class="logo-grid">`;
-            GOV_VENDORS.slice(0, SHOW).forEach(v => {
-                const url = `https://secpaas.org.tw/W_CDMList?cdm=A&kid=${v.kid}`;
-                h += `<a href="${url}" target="_blank" rel="noopener" class="logo-item" title="${esc(v.name)}">
-                    <img src="company_logos/${esc(v.logo)}" alt="${esc(v.name)}" loading="lazy"
-                         onerror="this.parentElement.style.display='none'">
-                </a>`;
-            });
-            if (total > SHOW) {
-                h += `<a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="logo-more">+${total-SHOW}<br>更多</a>`;
-            }
-            h += `</div><div class="rec-meta" style="margin-top:12px;">
-                <a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="link-btn">🔍 SecPaaS 查看全部 ${total} 家</a>
-            </div>`;
+            h += `<h3 style="margin:16px 0 8px;">💊 建議參考廠商（資安治理強化）：</h3>`;
+            h += buildLogoGrid(GOV_VENDORS, v=>`https://secpaas.org.tw/W_CDMList?cdm=A&kid=${v.kid}`, 'gov-assess', 'https://secpaas.org.tw/W_CDMList?cdm=A');
         }
     }
     h += '</div>';
@@ -820,15 +806,7 @@ function renderDashboard() {
                 D:'治理等級偏低，需立即採取行動改善資安治理架構，強烈建議委請顧問規劃。',
                 E:'治理等級危急，請立即委請顧問介入，全面盤點並重建資安治理基礎。'
             };
-            const SHOW = 12, total = GOV_VENDORS.length;
-            let logoHtml = '<div class="logo-grid">';
-            GOV_VENDORS.slice(0, SHOW).forEach(v => {
-                logoHtml += `<a href="https://secpaas.org.tw/W_CDMList?cdm=A&kid=${v.kid}" target="_blank" rel="noopener" class="logo-item" title="${esc(v.name)}">
-                  <img src="company_logos/${esc(v.logo)}" alt="${esc(v.name)}" loading="lazy" onerror="this.parentElement.style.display='none'">
-                </a>`;
-            });
-            if (total > SHOW) logoHtml += `<a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="logo-more">+${total-SHOW}<br>更多</a>`;
-            logoHtml += '</div>';
+            const govGrid = buildLogoGrid(GOV_VENDORS, v=>`https://secpaas.org.tw/W_CDMList?cdm=A&kid=${v.kid}`, `gov-${i}`, 'https://secpaas.org.tw/W_CDMList?cdm=A');
             rh += `<div class="expander">
               <div class="exp-header" onclick="toggleExp('${id}')">
                 <span>⚠️ 治理評等偏低：[等級 ${S.govGrade}]</span>
@@ -836,11 +814,7 @@ function renderDashboard() {
               </div>
               <div class="exp-body open" id="${id}b">
                 <p><strong>診斷：</strong>${govDescs[S.govGrade]}</p>
-                <p style="margin-top:6px;color:#aaa;font-size:.84em;">共 ${total} 家廠商提供資安治理顧問與強化服務</p>
-                ${logoHtml}
-                <div class="rec-meta">
-                  <a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="link-btn">🔍 SecPaaS 查看全部 ${total} 家</a>
-                </div>
+                ${govGrid}
               </div>
             </div>`;
             return;
@@ -852,23 +826,8 @@ function renderDashboard() {
         else                           { label='🟡 Tier 2 強化';   desc='防護覆蓋率 < 50%，需建立標準流程 (SOP)。'; }
 
         const vendors = CDM_VENDORS[`${cat}|${func}`] || [];
-        const total   = vendors.length;
-        const SHOW    = 12;
-        const shown   = vendors.slice(0, SHOW);
         const code    = cdmCode(cat, func);
-
-        let logoHtml = '<div class="logo-grid">';
-        shown.forEach(v => {
-            const url = secpaasUrl(cat, func, v.kid);
-            logoHtml += `<a href="${url}" target="_blank" rel="noopener" class="logo-item" title="${esc(v.name)}">
-              <img src="company_logos/${esc(v.logo)}" alt="${esc(v.name)}" loading="lazy"
-                   onerror="this.parentElement.style.display='none'">
-            </a>`;
-        });
-        if (total > SHOW) {
-            logoHtml += `<a href="https://secpaas.org.tw/W_CDMList?cdm=${code}" target="_blank" rel="noopener" class="logo-more">+${total-SHOW}<br>更多</a>`;
-        }
-        logoHtml += '</div>';
+        const logoHtml = buildLogoGrid(vendors, v=>secpaasUrl(cat,func,v.kid), `${code}-${i}`, `https://secpaas.org.tw/W_CDMList?cdm=${code}`);
 
         rh += `<div class="expander">
           <div class="exp-header" onclick="toggleExp('${id}')">
@@ -877,11 +836,7 @@ function renderDashboard() {
           </div>
           <div class="exp-body open" id="${id}b">
             <p><strong>診斷：</strong>${esc(desc)}</p>
-            <p style="margin-top:6px;color:#aaa;font-size:.84em;">共 ${total} 家廠商提供相關解決方案</p>
             ${logoHtml}
-            <div class="rec-meta">
-              <a href="https://secpaas.org.tw/W_CDMList?cdm=${code}" target="_blank" rel="noopener" class="link-btn">🔍 SecPaaS 查看全部 ${total} 家</a>
-            </div>
           </div>
         </div>`;
     });
@@ -891,6 +846,36 @@ function renderDashboard() {
 function toggleExp(id) {
     document.getElementById(id+'b').classList.toggle('open');
     document.getElementById(id+'a').classList.toggle('open');
+}
+
+function expandLogos(gridId) {
+    const grid = document.getElementById('lg-' + gridId);
+    const btn  = document.getElementById('lm-' + gridId);
+    if (grid) grid.querySelectorAll('.logo-hidden').forEach(el => el.classList.remove('logo-hidden'));
+    if (btn) btn.remove();
+}
+
+function buildLogoGrid(vendors, urlFn, gridId, secpaasListUrl, SHOW) {
+    SHOW = SHOW || 12;
+    const total = vendors.length;
+    let h = `<div class="logo-grid" id="lg-${gridId}">`;
+    vendors.forEach((v, idx) => {
+        const url = typeof urlFn === 'function' ? urlFn(v) : urlFn;
+        const hidden = idx >= SHOW ? ' logo-hidden' : '';
+        h += `<a href="${esc(url)}" target="_blank" rel="noopener" class="logo-item${hidden}" title="${esc(v.name)}">
+            <img src="company_logos/${esc(v.logo)}" alt="${esc(v.name)}" loading="lazy"
+                 onerror="this.parentElement.style.display='none'">
+        </a>`;
+    });
+    if (total > SHOW) {
+        h += `<button class="logo-more" id="lm-${gridId}" onclick="expandLogos('${gridId}')">+${total-SHOW}<br>展開</button>`;
+    }
+    h += '</div>';
+    h += `<div class="rec-meta" style="margin-top:12px;">
+        <span style="font-size:.84em;color:#888;">共 ${total} 家</span>
+        <a href="${secpaasListUrl}" target="_blank" rel="noopener" class="link-btn">🔍 SecPaaS 查看全部 ${total} 家</a>
+    </div>`;
+    return h;
 }
 
 // ============================================================
