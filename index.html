@@ -171,6 +171,17 @@
         .snap-meta { font-size:.82em; color:#888; margin-top:3px; }
         .snap-matrix { display:grid; grid-template-columns:repeat(6,1fr); gap:2px; margin-top:10px; font-size:.72em; }
         .snap-cell { padding:3px 2px; text-align:center; border-radius:3px; }
+
+        /* ── Governance grade buttons ── */
+        .grade-btn { padding:10px 22px; border:2px solid #444; border-radius:8px; background:#262730; color:#aaa; cursor:pointer; font-size:1.05em; font-weight:700; transition:all .15s; min-width:56px; }
+        .grade-btn:hover { border-color:#888; color:#fafafa; }
+        .gb-A { background:#082233 !important; color:#80ccff !important; border-color:#1166aa !important; }
+        .gb-B { background:#0e2f1a !important; color:#80ddaa !important; border-color:#22884a !important; }
+        .gb-C { background:#3d2e08 !important; color:#ffd080 !important; border-color:#886622 !important; }
+        .gb-D { background:#4d1010 !important; color:#ffaaaa !important; border-color:#882222 !important; }
+        .gb-E { background:#cc2222 !important; color:white !important; border-color:#ffd700 !important; }
+        .gov-instr { background:#1a1c26; border:1px solid #2a2c3a; border-radius:10px; padding:16px 20px; margin-bottom:16px; font-size:.88em; line-height:1.9; color:#ccc; }
+        .gov-instr strong { color:#ffd700; }
     </style>
 </head>
 <body>
@@ -230,22 +241,30 @@
 
         <!-- Manual add -->
         <h2>✍️ 手動新增資產</h2>
-        <div class="grid-add" style="margin-bottom:14px;">
+        <div class="grid-add" style="margin-bottom:14px;grid-template-columns:3fr 1.4fr 1.4fr auto auto;">
             <div>
                 <label>資產名稱</label>
                 <input type="text" id="newName" placeholder="例：核心資料庫" onkeydown="if(event.key==='Enter')addAsset()">
             </div>
             <div>
                 <label>類別</label>
-                <select id="newCat">
+                <select id="newCat" onchange="updateSubtypes()">
                     <option>裝置</option><option>應用程式</option><option>網路</option>
                     <option>資料</option><option>使用者</option>
                 </select>
             </div>
             <div>
+                <label>次分類（選填）</label>
+                <select id="newSubtype">
+                    <option value=""></option>
+                    <option>伺服器</option><option>端點/PC</option><option>網路設備</option>
+                    <option>儲存設備</option><option>IoT設備</option><option>行動裝置</option>
+                </select>
+            </div>
+            <div>
                 <label>&nbsp;</label>
                 <label class="checkbox-label">
-                    <input type="checkbox" id="newCritical"> 🔥 設為關鍵資產
+                    <input type="checkbox" id="newCritical"> 🔥 關鍵資產
                 </label>
             </div>
             <div>
@@ -281,11 +300,12 @@
             </ul>
         </div>
 
-        <div style="margin:16px 0; max-width:220px;">
+        <div style="margin:16px 0; max-width:240px;">
             <label>請選擇要評估的類別：</label>
             <select id="assessCat" onchange="renderAssess()">
                 <option>裝置</option><option>應用程式</option><option>網路</option>
                 <option>資料</option><option>使用者</option>
+                <option>治理</option>
             </select>
         </div>
 
@@ -338,10 +358,64 @@ const FUNC_LABELS = {"識別":"識別 (ID)","保護":"保護 (PR)","偵測":"偵
 const SCORE_LABELS = {0:"⚪ N/A",1:"🔴 <25% (低)",2:"🟡 25-50% (中)",3:"🟢 50-75% (高)",4:"🏆 >75% (全)"};
 const SECPAAS = "https://secpaas.org.tw/W_SecDocProduct";
 
+const SUBTYPES = {
+    "裝置":     ["","伺服器","端點/PC","網路設備","儲存設備","IoT設備","行動裝置"],
+    "應用程式": ["","Web應用","郵件系統","資料庫","ERP/業務系統","API服務","其他"],
+    "網路":     ["","防火牆/IPS","交換器/路由器","VPN","負載均衡","DNS","其他"],
+    "資料":     ["","個人資料","財務資料","機密/智財","備份資料","日誌","其他"],
+    "使用者":   ["","一般帳號","特權帳號","外部/廠商帳號","系統服務帳號"]
+};
+
+const GOV_VENDORS = [
+    {"name":"華經科技股份有限公司","logo":"ftsc.png","kid":"83364863"},
+    {"name":"漢昕科技股份有限公司","logo":"bccs.png","kid":"27488980"},
+    {"name":"詮睿科技股份有限公司","logo":"talent-jump.png","kid":"28767840"},
+    {"name":"三甲科技股份有限公司","logo":"aaasec.png","kid":"43366801"},
+    {"name":"數聯資安股份有限公司","logo":"issdu.png","kid":"27545716"},
+    {"name":"伊雲谷數位科技股份有限公司","logo":"ecloudvalley.png","kid":"54359763"},
+    {"name":"創逸科技服務有限公司","logo":"cretech.png","kid":"54552253"},
+    {"name":"動力安全資訊股份有限公司","logo":"dynasafe.png","kid":"80260294"},
+    {"name":"資誠智能風險管理諮詢公司","logo":"pwc.png","kid":"55785574"},
+    {"name":"誠雲科技股份有限公司","logo":"ct-cloud.png","kid":"53635609"},
+    {"name":"自由系統股份有限公司","logo":"freedom.png","kid":"79988938"},
+    {"name":"安碁資訊股份有限公司","logo":"acercsi.png","kid":"70565450"},
+    {"name":"德欣寰宇科技股份有限公司","logo":"tsc-tetch.png","kid":"70452786"},
+    {"name":"誠士資訊股份有限公司","logo":"suros.png","kid":"54857826"},
+    {"name":"勤業眾信聯合會計師事務所","logo":"deloitte.png","kid":"94998251"},
+    {"name":"新加坡商英國標準協會集團私人有限公司臺灣分公司","logo":"bsigroup.png","kid":"96975922"},
+    {"name":"竣盟科技股份有限公司","logo":"billows.png","kid":"54345092"},
+    {"name":"優士國際資安股份有限公司","logo":"usis.png","kid":"42903135"},
+    {"name":"台達電子工業股份有限公司","logo":"deltaww.png","kid":"34051920"},
+    {"name":"安華聯網科技股份有限公司","logo":"onwardsecurity.png","kid":"24572886"},
+    {"name":"資拓宏宇國際股份有限公司","logo":"iisigroup.png","kid":"28859051"},
+    {"name":"財團法人資訊工業策進會","logo":"iii.png","kid":"05076416"},
+    {"name":"資誠聯合會計師事務所","logo":"pwc.png","kid":"3932533"},
+    {"name":"頂峰資訊有限公司","logo":"hilltop-info.png","kid":"60296490"},
+    {"name":"開啟資安系統股份有限公司","logo":"openinfosec.png","kid":"94069425"},
+    {"name":"中華資安國際股份有限公司","logo":"chtsecurity.png","kid":"55765649"},
+    {"name":"天雷科技有限公司","logo":"ttcs.png","kid":"24506129"},
+    {"name":"關貿網路股份有限公司","logo":"tradevan.png","kid":"97162640"},
+    {"name":"雲森數位有限公司","logo":"cloud3w.png","kid":"90619855"},
+    {"name":"策略數位服務有限公司","logo":"sdsgservice.png","kid":"12953609"},
+    {"name":"領導力企業管理顧問有限公司","logo":"isoleader.png","kid":"25063115"},
+    {"name":"全捷資安有限公司","logo":"chiuan-jie.png","kid":"91095032"},
+    {"name":"聯瞻資訊股份有限公司","logo":"nspectrum.png","kid":"53951859"},
+    {"name":"中華電信股份有限公司","logo":"cht.png","kid":"96979933"},
+    {"name":"凌群電腦股份有限公司","logo":"syscom.png","kid":"04967550"},
+    {"name":"智慧資安科技股份有限公司","logo":"unixecure.png","kid":"90254779"},
+    {"name":"安侯企業管理股份有限公司","logo":"spo-global.png","kid":"22102494"},
+    {"name":"登豐數位科技股份有限公司","logo":"itop.png","kid":"53282197"},
+    {"name":"網安智慧科技股份有限公司","logo":"nsit.png","kid":"90403497"},
+    {"name":"博創資訊科技股份有限公司","logo":"safelink.png","kid":"27481662"},
+    {"name":"漢翔航空工業股份有限公司","logo":"aidc.png","kid":"97160544"},
+    {"name":"昕恩科技有限公司","logo":"xinen.png","kid":"83542895"},
+    {"name":"中揚資訊股份有限公司","logo":"joyyoung.png","kid":"28081502"}
+];
+
 // ============================================================
 // State & persistence
 // ============================================================
-let S = { assets:[], assessments:{} };
+let S = { assets:[], assessments:{}, govGrade: null };
 
 function save() { try { localStorage.setItem('cdm_v2', JSON.stringify(S)); } catch(e){} }
 function load() { try { const d = localStorage.getItem('cdm_v2'); if(d) S = JSON.parse(d); } catch(e){} }
@@ -385,7 +459,7 @@ function flash(id, type, msg, dur=3000) {
 // Excel download
 // ============================================================
 function downloadTemplate(mode) {
-    const rows = [["資產名稱","類別","關鍵資產"]];
+    const rows = [["資產名稱","類別","次分類","關鍵資產"]];
     if (mode === 'example') {
         const nameFn = {
             "裝置":     (i) => i<3 ? `核心伺服器_${String(i).padStart(2,'0')}` : `員工筆電_${300+i*7}`,
@@ -394,10 +468,11 @@ function downloadTemplate(mode) {
             "資料":     (i,c) => c ? `客戶個資DB_${i}` : `日常備份_${i}`,
             "使用者":   (i) => i>2 ? `行政人員_${String(i).padStart(2,'0')}` : `系統管理員_${String(i).padStart(2,'0')}`
         };
+        const subFn = {"裝置":"伺服器","應用程式":"ERP/業務系統","網路":"防火牆/IPS","資料":"個人資料","使用者":"一般帳號"};
         CATS.forEach(cat => {
             for (let i=1; i<=10; i++) {
                 const crit = Math.random() < 0.2;
-                rows.push([nameFn[cat](i,crit), cat, crit?"是":"否"]);
+                rows.push([nameFn[cat](i,crit), cat, i<=3?subFn[cat]:'', crit?"是":"否"]);
             }
         });
     }
@@ -434,6 +509,7 @@ function handleUpload(e) {
             _pendingImport = raw.slice(1).filter(r => r[col['資產名稱']]).map(r => ({
                 name:      String(r[col['資產名稱']]),
                 category:  CATS.includes(r[col['類別']]) ? r[col['類別']] : "裝置",
+                subtype:   col['次分類'] !== undefined ? String(r[col['次分類']]||'') : '',
                 isCritical: parseBool(r[col['關鍵資產']])
             }));
 
@@ -466,15 +542,23 @@ function confirmImport() {
 function addAsset() {
     const name = document.getElementById('newName').value.trim();
     const cat  = document.getElementById('newCat').value;
+    const sub  = document.getElementById('newSubtype').value;
     const crit = document.getElementById('newCritical').checked;
     if (!name) { flash('addMsg','error','請輸入名稱'); return; }
     if (S.assets.find(a => a.name===name)) { flash('addMsg','warning','資產名稱重複！'); return; }
-    S.assets.push({name, category:cat, isCritical:crit});
+    S.assets.push({name, category:cat, subtype:sub, isCritical:crit});
     save();
     document.getElementById('newName').value = '';
     document.getElementById('newCritical').checked = false;
     flash('addMsg','success','已新增：'+name);
     renderList();
+}
+
+function updateSubtypes() {
+    const cat = document.getElementById('newCat').value;
+    const sel = document.getElementById('newSubtype');
+    if (!sel) return;
+    sel.innerHTML = (SUBTYPES[cat]||['']).map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
 }
 
 function clearAll() {
@@ -493,9 +577,10 @@ function renderList() {
         el.innerHTML = '<div class="alert alert-info">👈 清單為空，請匯入或新增。</div>';
         return;
     }
-    let h = '<table class="asset-table"><thead><tr><th>資產名稱</th><th>類別</th><th>關鍵資產</th></tr></thead><tbody>';
+    let h = '<table class="asset-table"><thead><tr><th>資產名稱</th><th>類別</th><th>次分類</th><th>關鍵資產</th></tr></thead><tbody>';
     S.assets.forEach(a => {
         h += `<tr><td>${esc(a.name)}</td><td>${esc(a.category)}</td>
+              <td>${esc(a.subtype||'')}</td>
               <td>${a.isCritical?'<span class="critical-badge">🔥 是</span>':'否'}</td></tr>`;
     });
     el.innerHTML = h + '</tbody></table>';
@@ -506,6 +591,7 @@ function renderList() {
 // ============================================================
 function renderAssess() {
     const cat = document.getElementById('assessCat').value;
+    if (cat === '治理') { renderGovAssess(); return; }
     const assets = S.assets.filter(a => a.category===cat);
     const el = document.getElementById('assessContent');
 
@@ -560,6 +646,68 @@ function renderAssess() {
     });
 
     el.innerHTML = h;
+}
+
+function renderGovAssess() {
+    const el = document.getElementById('assessContent');
+    const grade = S.govGrade;
+    const GRADE_INFO = {
+        'A': {css:'gb-A', alert:'alert-success',  msg:'治理等級優良（A）。定期請顧問複查即可，持續維持良好態勢。'},
+        'B': {css:'gb-B', alert:'alert-success',  msg:'治理等級良好（B）。整體架構健全，建議針對少數缺口持續優化。'},
+        'C': {css:'gb-C', alert:'alert-warning',  msg:'治理等級中等（C）。<strong>建議儘速強化資安治理能力</strong>，可參考下方廠商評估導入方向。', needsRec:true},
+        'D': {css:'gb-D', alert:'alert-error',    msg:'治理等級偏低（D）。<strong>需立即採取行動</strong>改善資安治理架構，強烈建議委請顧問規劃。', needsRec:true},
+        'E': {css:'gb-E', alert:'alert-error',    msg:'治理等級危急（E）。<strong>請立即委請顧問介入</strong>，全面盤點並重建資安治理基礎。', needsRec:true},
+    };
+
+    let h = `<div class="gov-instr">
+        <strong>📋 評估方式說明</strong><br>
+        本項目評估依據廠商於「企業資安評等平台」完成之 <strong>42 題評級問卷</strong>結果，
+        由顧問依加權計算後選擇對應等級（A–E）。<br>
+        <span style="color:#888;font-size:.92em;">分數換算（V2023.05後版）：A（90–100分）、B（80–90分）、C（70–80分）、D（60–70分）、E（0–60分）</span>
+    </div>
+    <div class="card">
+        <h3 style="margin-bottom:14px;">請顧問選擇加權後等級：</h3>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;">`;
+    ['A','B','C','D','E'].forEach(g => {
+        const active = grade === g ? ` ${GRADE_INFO[g].css}` : '';
+        h += `<button class="grade-btn${active}" onclick="setGovGrade('${g}')">${g} 等</button>`;
+    });
+    if (grade) {
+        h += `<button class="btn btn-secondary" style="margin-left:12px;font-size:.82em;" onclick="setGovGrade(null)">清除</button>`;
+    }
+    h += '</div>';
+
+    if (grade) {
+        const info = GRADE_INFO[grade];
+        h += `<div class="alert ${info.alert}">${info.msg}</div>`;
+        if (info.needsRec) {
+            const SHOW = 12, total = GOV_VENDORS.length;
+            h += `<h3 style="margin:16px 0 8px;">💊 建議參考廠商（資安治理強化）：</h3>
+                  <p style="font-size:.84em;color:#aaa;margin-bottom:10px;">共 ${total} 家廠商提供資安治理顧問與強化服務</p>
+                  <div class="logo-grid">`;
+            GOV_VENDORS.slice(0, SHOW).forEach(v => {
+                const url = `https://secpaas.org.tw/W_CDMList?cdm=A&kid=${v.kid}`;
+                h += `<a href="${url}" target="_blank" rel="noopener" class="logo-item" title="${esc(v.name)}">
+                    <img src="company_logos/${esc(v.logo)}" alt="${esc(v.name)}" loading="lazy"
+                         onerror="this.parentElement.style.display='none'">
+                </a>`;
+            });
+            if (total > SHOW) {
+                h += `<a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="logo-more">+${total-SHOW}<br>更多</a>`;
+            }
+            h += `</div><div class="rec-meta" style="margin-top:12px;">
+                <a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="link-btn">🔍 SecPaaS 查看全部 ${total} 家</a>
+            </div>`;
+        }
+    }
+    h += '</div>';
+    el.innerHTML = h;
+}
+
+function setGovGrade(grade) {
+    S.govGrade = grade || null;
+    save();
+    renderGovAssess();
 }
 
 function switchTab(idx) {
@@ -640,6 +788,15 @@ function renderDashboard() {
         });
         h += '</tr>';
     });
+
+    // 治理列
+    const gv = S.govGrade;
+    const govMap = {A:['s-t4','等級 A'],B:['s-t3','等級 B'],C:['s-t2','等級 C'],D:['s-t1','等級 D'],E:['s-critical-risk','🔥 等級 E']};
+    const [govCss, govTxt] = gv ? govMap[gv] : ['s-pending','未評估'];
+    h += `<tr><td class="cat-head" style="background:#2a2040;color:#cc88ff;">治理</td>
+          <td colspan="5" class="${govCss}" style="text-align:center;font-size:.9em;">${govTxt}</td></tr>`;
+    if (['C','D','E'].includes(gv)) recList.push({cat:'治理', func:'', status:'gov'});
+
     h += '</tbody></table>';
     document.getElementById('cdmMatrix').innerHTML = h;
 
@@ -655,6 +812,40 @@ function renderDashboard() {
 
     let rh = `<p style="margin-bottom:12px;">共偵測到 <strong>${recList.length}</strong> 個弱點：</p>`;
     recList.forEach(({cat,func,status},i) => {
+        const id = `exp${i}`;
+
+        if (status === 'gov') {
+            const govDescs = {
+                C:'治理等級中等，建議儘速強化資安治理能力，可導入顧問服務規劃改善路徑。',
+                D:'治理等級偏低，需立即採取行動改善資安治理架構，強烈建議委請顧問規劃。',
+                E:'治理等級危急，請立即委請顧問介入，全面盤點並重建資安治理基礎。'
+            };
+            const SHOW = 12, total = GOV_VENDORS.length;
+            let logoHtml = '<div class="logo-grid">';
+            GOV_VENDORS.slice(0, SHOW).forEach(v => {
+                logoHtml += `<a href="https://secpaas.org.tw/W_CDMList?cdm=A&kid=${v.kid}" target="_blank" rel="noopener" class="logo-item" title="${esc(v.name)}">
+                  <img src="company_logos/${esc(v.logo)}" alt="${esc(v.name)}" loading="lazy" onerror="this.parentElement.style.display='none'">
+                </a>`;
+            });
+            if (total > SHOW) logoHtml += `<a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="logo-more">+${total-SHOW}<br>更多</a>`;
+            logoHtml += '</div>';
+            rh += `<div class="expander">
+              <div class="exp-header" onclick="toggleExp('${id}')">
+                <span>⚠️ 治理評等偏低：[等級 ${S.govGrade}]</span>
+                <span class="exp-arrow open" id="${id}a">▶</span>
+              </div>
+              <div class="exp-body open" id="${id}b">
+                <p><strong>診斷：</strong>${govDescs[S.govGrade]}</p>
+                <p style="margin-top:6px;color:#aaa;font-size:.84em;">共 ${total} 家廠商提供資安治理顧問與強化服務</p>
+                ${logoHtml}
+                <div class="rec-meta">
+                  <a href="https://secpaas.org.tw/W_CDMList?cdm=A" target="_blank" rel="noopener" class="link-btn">🔍 SecPaaS 查看全部 ${total} 家</a>
+                </div>
+              </div>
+            </div>`;
+            return;
+        }
+
         let label, desc;
         if (status==='critical_risk') { label='🔥 關鍵資產告急'; desc='重要資產防護低於標準 (Tier 3)，風險極高！'; }
         else if (status==='tier-1')   { label='🔴 Tier 1 缺口';   desc='防護覆蓋率 < 25%，形同裸奔。'; }
@@ -679,7 +870,6 @@ function renderDashboard() {
         }
         logoHtml += '</div>';
 
-        const id = `exp${i}`;
         rh += `<div class="expander">
           <div class="exp-header" onclick="toggleExp('${id}')">
             <span>${label}：[${esc(cat)} - ${esc(func)}]</span>
@@ -801,6 +991,14 @@ function renderHistory() {
                 mx += `<div class="snap-cell s-t${t}">T${t}</div>`;
             });
         });
+        // 治理列
+        const sg = snap.state.govGrade;
+        const govSnapCss = !sg ? 's-pending' : (sg==='A'?'s-t4':sg==='B'?'s-t3':sg==='C'?'s-t2':sg==='D'?'s-t1':'s-critical-risk');
+        mx += `<div class="snap-cell" style="background:#2a2040;color:#cc88ff;">治</div>`;
+        for (let fi=0; fi<5; fi++) {
+            if (fi===0) mx += `<div class="snap-cell ${govSnapCss}">${sg||'?'}</div>`;
+            else mx += `<div class="snap-cell s-no-asset"></div>`;
+        }
         mx += '</div>';
 
         h += `<div class="snap-item">
@@ -866,18 +1064,31 @@ function exportReport() {
         });
         matrixRows += `<tr>${cells}</tr>`;
     });
+    // 治理列
+    const rg = S.govGrade;
+    const govBgMap = {A:'#d0eaff',B:'#d4f5e2',C:'#fff5d0',D:'#ffe0e0',E:'#cc2222'};
+    const govColorMap = {A:'#003366',B:'#003322',C:'#664400',D:'#660000',E:'white'};
+    const govRptTxt = rg ? `治理評等 ${rg}` : '未評估';
+    matrixRows += `<tr>
+      <td style="background:#ede8f5;font-weight:600;padding:8px 12px;border:1px solid #ccc;color:#550088;">治理</td>
+      <td colspan="5" style="background:${rg?govBgMap[rg]:'#fff9e6'};color:${rg?govColorMap[rg]:'#888'};padding:8px;text-align:center;border:1px solid #ccc;font-weight:600;">${govRptTxt}</td>
+    </tr>`;
 
     const recList = [];
     CATS.forEach(cat => FUNCS.forEach(func => {
         const {status} = calcCell(cat, func);
         if (['critical_risk','tier-1','tier-2'].includes(status)) recList.push({cat, func, status});
     }));
+    if (['C','D','E'].includes(rg)) recList.push({cat:'治理', func:'(整體)', status:'gov'});
 
     let riskRows = recList.length === 0
         ? '<tr><td colspan="3" style="text-align:center;color:green;padding:14px;">✅ 無重大風險</td></tr>'
         : recList.map(({cat,func,status}) => {
             let level, desc;
-            if (status==='critical_risk') { level='🔥 關鍵告急'; desc='關鍵資產防護 < Tier 3，風險極高'; }
+            if (status==='gov') {
+                const gd = {C:'建議儘速強化資安治理能力，可導入顧問服務',D:'需立即採取行動改善資安治理架構',E:'請立即委請顧問介入，重建資安治理基礎'};
+                level=`⚠️ 治理等級 ${rg}`; desc=gd[rg];
+            } else if (status==='critical_risk') { level='🔥 關鍵告急'; desc='關鍵資產防護 < Tier 3，風險極高'; }
             else if (status==='tier-1')   { level='🔴 嚴重缺口'; desc='防護覆蓋率 < 25%，形同裸奔'; }
             else                           { level='🟡 需強化';   desc='防護覆蓋率 < 50%，需建立標準 SOP'; }
             return `<tr>
@@ -890,6 +1101,7 @@ function exportReport() {
     const assetRows = S.assets.map(a => `<tr>
         <td style="padding:7px 12px;border:1px solid #eee;">${a.name}</td>
         <td style="padding:7px 12px;border:1px solid #eee;">${a.category}</td>
+        <td style="padding:7px 12px;border:1px solid #eee;">${a.subtype||''}</td>
         <td style="padding:7px 12px;border:1px solid #eee;text-align:center;">${a.isCritical?'🔥 是':'否'}</td>
     </tr>`).join('');
 
@@ -908,7 +1120,7 @@ function exportReport() {
 </style></head><body>
 <h1>CDM 防禦成熟度評估報告</h1>
 <div class="meta">
-  評估日期：${ts}　　資產總數：${S.assets.length} 筆　　已評估：${Object.values(S.assessments).filter(v=>v>0).length} 筆　　風險項目：${recList.length} 項
+  評估日期：${ts}　　資產總數：${S.assets.length} 筆　　已評估：${Object.values(S.assessments).filter(v=>v>0).length} 筆　　治理評等：${rg||'未評估'}　　風險項目：${recList.length} 項
 </div>
 
 <h2>一、防禦成熟度矩陣</h2>
@@ -922,7 +1134,7 @@ function exportReport() {
 <tbody>${riskRows}</tbody></table>
 
 <h2>三、資產清單（共 ${S.assets.length} 筆）</h2>
-<table><thead><tr><th>資產名稱</th><th>類別</th><th>關鍵資產</th></tr></thead>
+<table><thead><tr><th>資產名稱</th><th>類別</th><th>次分類</th><th>關鍵資產</th></tr></thead>
 <tbody>${assetRows}</tbody></table>
 
 <button class="print-btn" onclick="window.print()">🖨️ 列印 / 儲存為 PDF</button>
